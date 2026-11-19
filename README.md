@@ -17,7 +17,7 @@
 | 数据 | SQLAlchemy 2.0 Async、aiomysql、MySQL 8 |
 | 缓存 | Redis（redis.asyncio），Cache-Aside |
 | 鉴权 | Bearer Token，服务端只存 SHA-256 摘要 |
-| AI | 阿里云百炼 DashScope，OpenAI 兼容接口，SSE 流式转发 |
+| AI | 阿里云百炼 DashScope，OpenAI 兼容接口，SSE 流式转发；无 Key 时自动演示模式 |
 | 前端 | Vue 3、Vite、Pinia、Vant、vue-i18n |
 | 质量 | pytest + httpx ASGITransport、Ruff |
 
@@ -49,7 +49,8 @@ pip install -r requirements.txt
 # 3) 配置环境变量
 copy env.example .env        # Windows
 cp env.example .env          # macOS / Linux
-# 编辑 .env：DATABASE_URL、REDIS_URL、DASHSCOPE_API_KEY
+# 编辑 .env：DATABASE_URL、REDIS_URL
+# DASHSCOPE_API_KEY 可以留空：默认走 AI 演示模式，不产生费用
 
 # 4) 启动
 uvicorn main:app --reload --port 8000
@@ -81,6 +82,26 @@ docker compose up -d --build
 ```
 
 `docker-compose.yml` 会在 MySQL 首次初始化时自动执行 `database.sql`。
+
+### 2.5 AI 演示模式（默认，无需 Key）
+
+本仓库**不提交任何真实 Key**。没有配置 `DASHSCOPE_API_KEY` 时，默认 `AI_MOCK_MODE=true`：
+
+- 接口仍是 `POST /api/v1/ai/chat`，仍要求登录、走限流、返回标准 SSE；
+- 内容是一段预设的中文回复，按 8 个字符一块、带 35ms 延迟输出，用来展示流式效果；
+- 响应头带 `X-AI-Mode: mock`，前端会显示“演示模式”提示；
+- 不请求 DashScope，不产生费用。
+
+演示模式的实际输出（节选）：
+
+```text
+你：介绍一下这个项目
+
+AI（演示模式）：当前没有配置 DASHSCOPE_API_KEY，下面展示的是一段预设的流式回复，
+不会调用真实模型。你刚才问的是：介绍一下这个项目……
+```
+
+配置真实 Key 后自动切换为通义千问；如果把 `AI_MOCK_MODE=false` 且不配 Key，接口会返回 `503 AI 服务未配置`。演示模式只是让别人能体验交互，**不代表真实模型效果**。
 
 ---
 
@@ -169,6 +190,7 @@ docker compose up -d --build
 2. **AI 代理**
    原 `/api/ai/chat` 无鉴权、模型任意、无限额，且“假流式”（先缓冲完整响应再包成 SSE）。
    现在必须登录、模型白名单、按用户限流；`httpx` 以 `stream=True` 读取，`StreamingResponse` 逐块转发，上游非 200 返回 502。
+   无 Key 时默认返回 **带 `X-AI-Mode: mock` 的演示 SSE**，既能让别人开箱体验，又不会把真实 Key 暴露到仓库。
 3. **DEBUG 泄露**
    原 `DEBUG_MODE=True` 把 traceback/SQL/URL 返回客户端。现在由 `DEBUG` 环境变量控制，默认关闭。
 4. **CORS**
@@ -198,7 +220,7 @@ docker compose up -d --build
 - 统一 `Base`、统一 `TimestampMixin`，避免多份 `DeclarativeBase` 导致 Alembic/`create_all` 漏表。
 - 统一异常处理：HTTP / 参数校验 / 完整性约束 / SQLAlchemy / 兜底。
 - 请求 ID + 耗时日志；`/health` 同时检查 DB 与 Redis。
-- pytest 接口回归：7 个用例覆盖契约、鉴权、收藏、历史、AI。
+- pytest 接口回归：8 个用例覆盖契约、鉴权、收藏、历史、AI 演示流。
 - `requirements.txt` 只列直接依赖；开发依赖拆到 `requirements-dev.txt`。
 
 ---
@@ -217,7 +239,7 @@ npm run build
 
 本仓库当前验证结果：
 
-- 后端：`7 passed`（SQLite 测试库，无需本地 MySQL/Redis）。
+- 后端：`8 passed`（SQLite 测试库，无需本地 MySQL/Redis）。
 - 前端：`npm run build` 成功，414 modules transformed。
 - OpenAPI：22 个 path，`/docs` 可直接调试。
 
@@ -243,6 +265,7 @@ npm run build
 - 未引入 Alembic：当前用 `database.sql` + `migration_v2.sql` 管理 schema；后续可接 Alembic。
 - 限流基于单 Redis 实例，多实例部署时共享计数；Redis 故障时 fail-open。
 - AI 代理只做转发与限额，不保存对话记录；`ai_chat` 表仍未启用。
+- 默认的 AI 演示模式返回固定文本，只用于展示 SSE/前端渲染；真实效果需自行配置 Key。
 - 前端 Token 存在 localStorage，已有 401 自动清理；更高安全要求可改 HttpOnly Cookie + CSRF。
 - 原始项目 `.env` 因安全策略未复制到本仓库，请按 `env.example` 重新配置。
 

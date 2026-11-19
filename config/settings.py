@@ -69,6 +69,9 @@ DASHSCOPE_URL = os.getenv(
     "DASHSCOPE_URL",
     "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
 )
+# [优化] 没有 Key 时默认走“演示模式”，返回预设的 SSE，方便别人 clone 后直接体验。
+# 配置了真实 Key 时始终调用真实模型；把 AI_MOCK_MODE 设为 false 可强制关闭演示。
+AI_MOCK_MODE = _get_bool("AI_MOCK_MODE", True)
 AI_RATE_LIMIT = _get_int("AI_RATE_LIMIT", 30)
 AI_RATE_WINDOW = _get_int("AI_RATE_WINDOW", 3600)
 AI_ALLOWED_MODELS = _get_list("AI_ALLOWED_MODELS", "qwen-plus,qwen-turbo,qwen-max")

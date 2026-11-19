@@ -3,6 +3,10 @@
     <van-nav-bar title="AI问答" fixed />
     
     <div class="chat-content">
+      <!-- [优化] 后端无 Key 时会返回 X-AI-Mode: mock；明确告诉用户这是预设回复，避免误解。 -->
+      <div v-if="isMockMode" class="demo-banner">
+        演示模式：未配置 API Key，以下为预设流式回复，不会调用真实模型
+      </div>
       <div class="messages-container" ref="messagesContainer">
         <div 
           v-for="(message, index) in messages" 
@@ -71,6 +75,7 @@ const messages = ref([
 const userInput = ref('');
 const messagesContainer = ref(null);
 const isLoading = ref(false);
+const isMockMode = ref(false);
 
 const userStore = useUserStore();
 const router = useRouter();
@@ -158,6 +163,9 @@ const fetchAIResponse = async (userMessage) => {
       const error = await response.json().catch(() => ({}));
       throw new Error(error.message || error.detail || `HTTP error! status: ${response.status}`);
     }
+
+    // [优化] 让用户知道当前是演示回复，而不是真实模型输出。
+    isMockMode.value = response.headers.get('X-AI-Mode') === 'mock';
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -279,6 +287,17 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.demo-banner {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  background: #fff7e6;
+  color: #ad6800;
+  border-bottom: 1px solid #ffe7ba;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
 }
 
 .messages-container {

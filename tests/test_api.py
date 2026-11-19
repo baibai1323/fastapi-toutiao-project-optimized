@@ -147,3 +147,20 @@ async def test_ai_chat_requires_login_and_whitelists_model(client, auth_headers)
         headers=auth_headers,
     )
     assert bad_model.status_code == 422
+
+
+async def test_ai_mock_mode_streams_without_api_key(client, auth_headers):
+    """没有 DASHSCOPE_API_KEY 时默认走演示流，保证 clone 后能直接体验。"""
+    response = await client.post(
+        "/api/v1/ai/chat",
+        json={
+            "model": "qwen-plus",
+            "messages": [{"role": "user", "content": "介绍一下这个项目"}],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 200, response.text
+    assert response.headers["x-ai-mode"] == "mock"
+    assert "data:" in response.text
+    assert "[DONE]" in response.text
+    assert "演示模式" in response.text

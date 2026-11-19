@@ -60,7 +60,7 @@ app.add_middleware(
     allow_credentials=not allow_all,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
-    expose_headers=["X-Request-ID", "X-Process-Time-Ms"],
+    expose_headers=["X-Request-ID", "X-Process-Time-Ms", "X-AI-Mode"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1024)
 
