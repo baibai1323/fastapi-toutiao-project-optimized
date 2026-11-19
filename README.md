@@ -1,5 +1,7 @@
 # XWZX News API · 优化版
 
+> GitHub：<https://github.com/baibai1323/fastapi-toutiao-project-optimized>
+
 一个基于 **FastAPI + SQLAlchemy 2.0 Async + MySQL + Redis** 的新闻资讯后端，配套 Vue 3 移动端。
 本仓库是原 `fastapi-toutiao-project` 的重构版：保留原有业务与目录风格，逐项修复了原项目中的契约、安全、缓存、索引和事务问题，并在代码中用中文注释标出 **原代码 / 问题 / 修复**。
 
