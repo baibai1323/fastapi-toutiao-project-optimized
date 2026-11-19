@@ -1,0 +1,25 @@
+# 敏感配置
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.sqlite3
+*.db
+logs/
+*.log
+
+# 前端
+node_modules/
+dist/
+.DS_Store

@@ -1,0 +1,80 @@
+### 服务信息
+GET http://127.0.0.1:8000/
+
+### 健康检查
+GET http://127.0.0.1:8000/health
+
+### 分类
+GET http://127.0.0.1:8000/api/v1/news/categories
+
+### 新闻列表
+GET http://127.0.0.1:8000/api/v1/news/list?page=1&pageSize=10
+
+### 按分类
+GET http://127.0.0.1:8000/api/v1/news/list?categoryId=1&page=1&pageSize=10
+
+### 新闻详情
+GET http://127.0.0.1:8000/api/v1/news/detail?id=1
+
+### 浏览计数
+POST http://127.0.0.1:8000/api/v1/news/1/view
+
+### 注册
+POST http://127.0.0.1:8000/api/v1/user/register
+Content-Type: application/json
+
+{
+  "username": "demo_user",
+  "password": "Passw0rd!"
+}
+
+### 登录（把返回的 token 填到下面）
+POST http://127.0.0.1:8000/api/v1/user/login
+Content-Type: application/json
+
+{
+  "username": "demo_user",
+  "password": "Passw0rd!"
+}
+
+### 当前用户
+GET http://127.0.0.1:8000/api/v1/user/info
+Authorization: Bearer {{token}}
+
+### 收藏
+POST http://127.0.0.1:8000/api/v1/favorite/add
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "newsId": 1
+}
+
+### 收藏列表
+GET http://127.0.0.1:8000/api/v1/favorite/list?page=1&pageSize=10
+Authorization: Bearer {{token}}
+
+### 写历史
+POST http://127.0.0.1:8000/api/v1/history/add
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "newsId": 1
+}
+
+### 历史列表
+GET http://127.0.0.1:8000/api/v1/history/list?page=1&pageSize=20
+Authorization: Bearer {{token}}
+
+### AI 对话（SSE）
+POST http://127.0.0.1:8000/api/v1/ai/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "model": "qwen-plus",
+  "messages": [
+    { "role": "user", "content": "用三句话介绍这个新闻项目" }
+  ]
+}

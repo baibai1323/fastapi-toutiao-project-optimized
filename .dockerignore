@@ -1,0 +1,15 @@
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+tests
+03-前端项目代码/xwzx-news/node_modules
+03-前端项目代码/xwzx-news/dist
+*.db
+.env
+.env.*
+!.env.example

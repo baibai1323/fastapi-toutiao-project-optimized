@@ -1,0 +1,12 @@
+# 生产依赖（只列直接依赖，版本用兼容范围，避免全量 freeze）
+fastapi>=0.125,<1.0
+uvicorn[standard]>=0.38,<1.0
+SQLAlchemy[asyncio]>=2.0.45,<2.1
+aiomysql>=0.3,<0.4
+PyMySQL>=1.1,<2.0
+cryptography>=46,<47
+redis>=6,<9
+pydantic>=2.12,<3.0
+python-dotenv>=1.2,<2.0
+httpx>=0.28,<1.0
+passlib>=1.7.4,<2.0

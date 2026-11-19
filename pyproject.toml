@@ -1,0 +1,20 @@
+[project]
+name = "xwzx-news-api"
+version = "2.0.0"
+description = "FastAPI 新闻资讯后端：全异步分层、Redis 缓存、Token 鉴权、AI 流式代理"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["venv", ".venv", "03-前端项目代码"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["E501"]
