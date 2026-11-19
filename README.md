@@ -202,7 +202,7 @@ AI（演示模式）：当前没有配置 DASHSCOPE_API_KEY，下面展示的是
 
 1. **缓存 key 忽略分页**
    原分类列表只用一个 key，第一次请求的 `skip/limit` 被缓存 2 小时。
-   现在 key 带 `category/page/size`，分类不分页；空列表短缓存 120s，count 缓存 300s。
+   现在 key 带 `category/page/size`，分类不分页；空列表短缓存 120s。列表与 `total` 写在同一个缓存值里，避免列表与计数 TTL 不同步时出现“有数据但 total=0”。
 2. **缓存穿透/雪崩**
    TTL 加 ±10% 抖动；空结果缓存；Redis 故障 fail-open 回退数据库，并记录日志。
 3. **索引**

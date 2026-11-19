@@ -38,23 +38,15 @@ async def get_categories(db: AsyncSession) -> list[CachedCategory]:
 async def get_news_list(
     db: AsyncSession, category_id: Optional[int], page: int, size: int
 ) -> tuple[list[CachedNewsItem], int]:
-    cached_list = await cache_store.get_cache_news_list(category_id, page, size)
-    cached_total = await cache_store.get_cached_news_count(category_id)
-
-    if cached_list is not None:
-        # 列表命中但 count 过期时，只补一次 count，不重查列表。
-        if cached_total is None:
-            cached_total = await news_crud.get_news_count(db, category_id)
-            await cache_store.set_cached_news_count(category_id, cached_total)
-        return cached_list, cached_total
+    cached = await cache_store.get_cache_news_list(category_id, page, size)
+    if cached is not None:
+        return cached
 
     items = await news_crud.get_news_list(db, category_id, page, size)
-    await cache_store.set_cache_news_list(category_id, page, size, items)
-
-    if cached_total is None:
-        cached_total = await news_crud.get_news_count(db, category_id)
-        await cache_store.set_cached_news_count(category_id, cached_total)
-    return items, cached_total
+    total = await news_crud.get_news_count(db, category_id)
+    # 列表与 total 一次写入，避免两者 TTL 不同步导致 total 与列表错位。
+    await cache_store.set_cache_news_list(category_id, page, size, items, total)
+    return items, total
 
 
 async def get_detail(db: AsyncSession, news_id: int) -> CachedNewsDetail:

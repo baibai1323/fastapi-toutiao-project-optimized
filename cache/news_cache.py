@@ -30,15 +30,13 @@ from cache.news_cache_schemas import (
 from config.cache_conf import delete_cache, get_json_cache, set_cache
 
 CATEGORIES_KEY = "news:v2:categories"
-NEWS_LIST_PREFIX = "news:v2:list:"
-NEWS_COUNT_PREFIX = "news:v2:count:"
+NEWS_LIST_PREFIX = "news:v3:list:"
 NEWS_DETAIL_PREFIX = "news:v2:detail:"
 RELATED_NEWS_PREFIX = "news:v2:related:"
 
 CATEGORIES_TTL = 7200
 LIST_TTL = 1800
 EMPTY_LIST_TTL = 120
-COUNT_TTL = 300
 DETAIL_TTL = 300
 RELATED_TTL = 1800
 
@@ -62,11 +60,18 @@ def _list_key(category_id: Optional[int], page: int, size: int) -> str:
 
 async def get_cache_news_list(
     category_id: Optional[int], page: int, size: int
-) -> list[CachedNewsItem] | None:
+) -> tuple[list[CachedNewsItem], int] | None:
+    """返回 (列表, 总数)。
+
+    总数与列表放在同一个缓存值里：两者必须同生同灭，否则会出现
+    “新列表 + 旧 total”的错位（旧实现 list TTL 与 count TTL 不同导致）。
+    """
     data = await get_json_cache(_list_key(category_id, page, size))
-    if data is None:
+    if not isinstance(data, dict):
+        # 旧版本缓存的是裸列表，结构已变，直接视为未命中。
         return None
-    return [CachedNewsItem.model_validate(item) for item in data]
+    items = [CachedNewsItem.model_validate(item) for item in data.get("items", [])]
+    return items, int(data.get("total", 0))
 
 
 async def set_cache_news_list(
@@ -74,21 +79,14 @@ async def set_cache_news_list(
     page: int,
     size: int,
     news_list: list[CachedNewsItem],
+    total: int,
 ) -> bool:
-    payload = [item.model_dump(mode="json", by_alias=True) for item in news_list]
-    ttl = LIST_TTL if payload else EMPTY_LIST_TTL
+    payload = {
+        "items": [item.model_dump(mode="json", by_alias=True) for item in news_list],
+        "total": total,
+    }
+    ttl = LIST_TTL if payload["items"] else EMPTY_LIST_TTL
     return await set_cache(_list_key(category_id, page, size), payload, ttl)
-
-
-async def get_cached_news_count(category_id: Optional[int]) -> int | None:
-    category_part = category_id if category_id is not None else "all"
-    value = await get_json_cache(f"{NEWS_COUNT_PREFIX}{category_part}")
-    return int(value) if value is not None else None
-
-
-async def set_cached_news_count(category_id: Optional[int], total: int) -> bool:
-    category_part = category_id if category_id is not None else "all"
-    return await set_cache(f"{NEWS_COUNT_PREFIX}{category_part}", total, COUNT_TTL)
 
 
 async def get_cached_news_detail(news_id: int) -> CachedNewsDetail | None:
