@@ -12,10 +12,20 @@ import http, { errorMessage } from '../../config/http'
  *   4. 详情 GET 曾经顺带 +1 浏览量，GET 不幂等；
  *   5. 用 newsData.length < pageSize 判断结束，遇到后端过滤/限流会误判。
  * 修复：统一 http、去掉 mock 死代码、用后端 hasMore 判断、浏览单独 POST。
+ *
+ * 本模块只负责“新闻数据”本身：分类、列表、详情、浏览量。
+ * 收藏和浏览历史各自独立成 store，避免新闻模块越来越臃肿，也方便单独复用。
  */
 
+// 业务约定：
+// - currentCategory 用数字 id 表示当前栏目，1 是默认“头条”；
+// - 列表分页由后端 hasMore 决定是否还有下一页，前端不靠“返回条数是否满 10 条”猜测；
+// - 所有接口失败都只影响当前模块，页面仍尽量用兜底数据渲染，不把异常抛到全局。
 export const useNewsStore = defineStore('news', {
+  // state 同时保存列表、详情和加载标志；loading / refreshing 分开，是为了让 Vant 的下拉刷新和上拉加载互不干扰。
+  // finished 为 true 时列表底部显示“没有更多了”，并停止继续触发加载。
   state: () => ({
+    // 列表与详情分开存：列表用于滚动渲染，详情用于详情页，互不覆盖。
     newsList: [],
     newsDetail: {},
     categories: [],
@@ -27,6 +37,9 @@ export const useNewsStore = defineStore('news', {
   }),
 
   actions: {
+    // 获取栏目分类。categoriesLoading 起到“请求锁”的作用：
+    // 页面可能在多个组件里同时调用，重复请求既浪费流量，也可能让后返回的旧数据覆盖新数据。
+    // 分类是全局导航的基础数据，失败时用内置列表兜底，保证首屏至少有可点的栏目。
     async getCategories() {
       if (this.categoriesLoading) return
 
@@ -34,6 +47,7 @@ export const useNewsStore = defineStore('news', {
       try {
         const response = await http.get('/news/categories')
         if (response.data?.code === 200) {
+          // 后端返回空数组时保留当前分类，不要把它改成 undefined，否则列表请求会丢掉分类条件。
           this.categories = response.data.data || []
           if (!this.currentCategory && this.categories.length > 0) {
             this.currentCategory = this.categories[0].id
@@ -57,6 +71,9 @@ export const useNewsStore = defineStore('news', {
       }
     },
 
+    // 切换栏目：同一个栏目重复点击直接返回，避免无意义地清空列表重新请求。
+    // 切换后必须清空旧列表并把 finished 复位，否则新栏目会接着旧页码加载、或直接显示“没有更多”。
+    // 这里返回 Promise，页面可以 await 后在 finally 里关闭自己的 loading 状态。
     changeCategory(categoryId) {
       if (this.currentCategory === categoryId) return
       this.currentCategory = categoryId
@@ -65,6 +82,8 @@ export const useNewsStore = defineStore('news', {
       return this.getNewsList(true)
     },
 
+    // 获取新闻列表。isRefresh 为 true 表示下拉刷新（回到第 1 页并清空旧数据），
+    // 为 false 表示上拉加载下一页（把新数据追加到现有列表后面）。
     async getNewsList(isRefresh = false) {
       // 注意：不要在这里判断 this.loading/this.refreshing。
       // Vant 的 van-list / van-pull-refresh 会先通过 v-model 把标志置为 true，
@@ -78,6 +97,8 @@ export const useNewsStore = defineStore('news', {
       }
 
       try {
+        // 页码按“已加载条数 / 每页 10 条”反推：第 1 页加载 10 条后，下一请求就是第 2 页。
+        // 10 必须和下面 pageSize 保持一致，否则会出现跳页或重复数据。
         const page = isRefresh ? 1 : Math.floor(this.newsList.length / 10) + 1
         const response = await http.get('/news/list', {
           params: {
@@ -102,6 +123,8 @@ export const useNewsStore = defineStore('news', {
       }
     },
 
+    // 获取新闻详情。只负责取数据，不在这里记浏览量；
+    // 浏览量拆到 recordView()，因为 GET 应当幂等，刷新详情页不应该把阅读数越刷越高。
     async getNewsDetail(id) {
       try {
         const response = await http.get('/news/detail', { params: { id } })
@@ -123,6 +146,7 @@ export const useNewsStore = defineStore('news', {
      *   现在拆成 POST，并且失败不影响详情展示。
      */
     async recordView(id) {
+      // 详情页拿到 id 后调用一次即可；重复调用会产生多条浏览记录，计数由后端按用户/时间去重。
       try {
         const response = await http.post(`/news/${id}/view`)
         if (response.data?.code === 200) {
@@ -139,6 +163,8 @@ export const useNewsStore = defineStore('news', {
       return null
     },
 
+    // 把分类 id 翻译成显示名称。找不到时返回“未知”而不是抛错，
+    // 因为分类列表可能还没加载完，详情页不应因此白屏。
     getCategoryName(categoryId) {
       const category = this.categories.find((item) => item.id === categoryId)
       return category ? category.name : '未知'

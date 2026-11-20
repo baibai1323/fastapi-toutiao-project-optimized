@@ -66,6 +66,8 @@ import { useFavoriteStore } from '../store/modules/favorite'
 import { useUserStore } from '../store/user'
 import { showToast } from 'vant'
 
+// 详情页依赖四块共享状态：新闻详情、浏览历史、收藏、登录用户。
+// 它们都由 Pinia 仓库统一管理，所以别的页面加过的收藏/历史，这里能立刻读到。
 const route = useRoute()
 const router = useRouter()
 const newsStore = useNewsStore()
@@ -74,30 +76,37 @@ const favoriteStore = useFavoriteStore()
 const userStore = useUserStore()
 
 // 获取路由参数中的新闻ID
+// 地址栏里的参数都是字符串，Number(...) 转成数字后和后端 id 类型一致，比较才不会失败。
 const newsId = computed(() => Number(route.params.id))
 
 // 将内容拆分为段落
+// 后端正文用两个换行分段，这里按 "\n\n" 切开，模板就能一段一个 <p> 排版。
 const contentParagraphs = computed(() => {
   if (!newsStore.newsDetail.content) return []
+  // filter 去掉空段落，否则页面上会出现没有文字的空行。
   return newsStore.newsDetail.content.split('\n\n').filter(p => p.trim())
 })
 
 // 返回上一页
+// 用 back() 而不是 push('/')，用户按返回键能回到原来那一页，不会多一层历史。
 const onClickLeft = () => {
   router.back()
 }
 
 // 跳转到相关新闻
+// 相关新闻仍是详情页，只是路由里的 id 换成另一篇，组件会复用、重新发请求。
 const goToRelatedNews = (id) => {
   router.push(`/news/detail/${id}`)
 }
 
 // 判断当前新闻是否已收藏
+// 用计算属性是因为收藏列表一变就要重算，模板里的星星图标才能跟着切换。
 const isFavorite = computed(() => {
   return favoriteStore.isFavorite(newsId.value)
 })
 
 // 切换收藏状态
+// 收藏属于个人数据，服务端要求带上登录凭证，所以未登录必须先拦下来，不然请求会 401。
 const toggleFavorite = async () => {
   // 判断用户是否已登录
   if (!userStore.getLoginStatus) {
@@ -111,6 +120,7 @@ const toggleFavorite = async () => {
   }
   
   // 已登录则调用API切换收藏状态
+  // 返回值有三种：true=刚收藏、false=刚取消、null=请求失败，下面据此给不同提示。
   const status = await favoriteStore.toggleFavorite(newsStore.newsDetail)
   
   if (status === true) {
@@ -133,7 +143,9 @@ const toggleFavorite = async () => {
 }
 
 // 组件挂载时获取新闻详情并添加到浏览历史
+// onMounted 是“页面显示到屏幕上之后执行一次”的钩子，适合放首屏请求。
 onMounted(async () => {
+  // 先拿详情：模板只有拿到 id 才渲染正文，没拿到就一直显示“加载中...”。
   await newsStore.getNewsDetail(newsId.value)
   
   // [优化] 浏览量从 GET /detail 中拆出来，改为显式 POST /news/{id}/view。
@@ -145,11 +157,13 @@ onMounted(async () => {
   // 添加到浏览历史
   if (newsStore.newsDetail.id) {
     // 先调用API记录浏览历史
+    // 历史记录分两路：登录用户存到服务端（换设备也能看到），未登录只留本地。
     if (userStore.getLoginStatus) {
       try {
         const result = await historyStore.addHistoryApi(newsStore.newsDetail.id);
         console.log('记录浏览历史API结果:', result);
       } catch (error) {
+        // 上报失败只打日志：历史只是辅助功能，不能因为它出错就不让用户看新闻。
         console.error('记录浏览历史API失败:', error);
       }
     }
@@ -159,13 +173,17 @@ onMounted(async () => {
   }
   
   // 加载收藏数据
+  // 先把本地缓存的收藏读出来，页面立刻能显示正确的星星状态，不用等下面接口。
   favoriteStore.loadFavorites()
   
   // 检查文章收藏状态
+  // 再用服务端结果校正本地：用户可能换了设备，本地缓存未必是准确的。
   if (userStore.getLoginStatus && newsStore.newsDetail.id) {
     const result = await favoriteStore.checkFavoriteStatusApi(newsStore.newsDetail.id)
+    // isLocal=true 表示这只是本地兜底结果，并不代表服务端真实状态，不能拿来覆盖。
     if (result.success && !result.isLocal) {
       // 如果API请求成功且不是本地状态，更新本地收藏状态
+      // 服务端说已收藏而本地没有，就补一条；反过来就删掉，保证两边最终一致。
       if (result.isFavorite && !favoriteStore.isFavorite(newsStore.newsDetail.id)) {
         favoriteStore.addFavorite(newsStore.newsDetail)
       } else if (!result.isFavorite && favoriteStore.isFavorite(newsStore.newsDetail.id)) {

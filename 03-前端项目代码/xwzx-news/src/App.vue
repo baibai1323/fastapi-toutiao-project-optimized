@@ -14,6 +14,14 @@
 </template>
 
 <script setup>
+/**
+ * 应用根组件（SFC，Single-File Component，单文件组件：把模板、逻辑、样式放在同一个 .vue 文件）。
+ * 这里只负责最外层布局和路由出口，不放具体业务，避免每个页面都跟着重新渲染。
+ *
+ * 约定：路由 meta.keepAlive 为 true 时，把页面包进 <keep-alive> 缓存组件实例，
+ * 例如首页从详情页返回时能保留列表和滚动位置；详情页设为 false，保证每次进入都重新取数。
+ * 模板里的 <router-view> 是路由匹配到的页面占位符，Component 就是当前页面组件。
+ */
 // App.vue 作为根组件
 </script>
 

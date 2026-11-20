@@ -59,17 +59,23 @@ import TabBar from '../components/TabBar.vue'
  *       删掉 showDropdown/更多下拉死代码；越界保护。
  */
 
+// 新闻仓库（Pinia store）：分类列表、新闻列表、分页状态都存在这里，多个页面共享同一份数据。
+// router 负责“跳转”，route 负责“读当前地址”，名字很像但职责完全不同。
 const newsStore = useNewsStore()
 const router = useRouter()
 const route = useRoute()
+// t 是 i18n 的翻译函数：t('home.title') 会按当前语言返回对应文案。
 const { t } = useI18n()
 
+// activeTab 是 van-tabs 的 v-model 值，存的是“第几个分类”，从 0 开始数。
 const activeTab = ref(0)
 // 分类加载完成前，watch 不触发请求，避免 categories 为空时越界。
 let initialized = false
 
+// 直接复用仓库里的分类数组；包成计算属性后，仓库数据一变模板就自动跟着变。
 const displayCategories = computed(() => newsStore.categories)
 
+// 后端分类名是中文（如“头条”），界面又要跟随中英文切换，所以先映射成 i18n 的 key 再翻译。
 const getCategoryTranslation = (categoryName) => {
   const categoryMap = {
     '头条': 'headline',
@@ -88,6 +94,7 @@ const getCategoryTranslation = (categoryName) => {
   return key ? t(`home.categories.${key}`) : categoryName
 }
 
+// 右上角“更多”按钮进入分类总览页；用 push 而不是 replace，用户点返回还能回到首页。
 const goToCategory = () => {
   router.push('/category')
 }
@@ -104,6 +111,8 @@ const syncTabFromRoute = () => {
   return true
 }
 
+// onMounted 是组件第一次显示到屏幕上之后的钩子，首屏的分类和新闻都在这里拉。
+// 注意这里是 async 函数：await 会等接口返回再继续，模板上的 loading 会自己处理。
 onMounted(async () => {
   await newsStore.getCategories()
 
@@ -116,17 +125,21 @@ onMounted(async () => {
     )
     if (index === -1) index = 0
     activeTab.value = index
+    // currentCategory 是仓库记的“当前分类 id”，这里一起改掉，刷新后才不会跳回别的分类。
     newsStore.currentCategory = displayCategories.value[index].id
   }
 
+  // initialized 置 true 之后，watch 才允许按 Tab 切换发请求。
   initialized = true
   await newsStore.getNewsList(true)
 })
 
 // 点击/滑动 Tab 只在这里触发一次分类切换。
+// 与“点一次发两次请求”的老写法相比，唯一的触发点在这里，逻辑更好排查。
 watch(activeTab, (index) => {
   if (!initialized) return
   const category = displayCategories.value[index]
+  // 越界保护：分类没加载完时 index 可能指向不存在的项，直接返回避免报错。
   if (!category) return
   newsStore.changeCategory(category.id)
 })
@@ -139,10 +152,14 @@ watch(
   }
 )
 
+// 下拉刷新：参数 true 表示“重置回第一页”，否则新数据会接在旧列表后面。
+// van-pull-refresh 自己管刷新动画，我们只要重新拉一次数据即可。
 const onRefresh = () => {
   newsStore.getNewsList(true)
 }
 
+// 触底加载更多：van-list 滚到底部时回调它，不传参数表示“接着加载下一页”。
+// 分页的好处是一次不拉太多数据，手机流量和首屏速度都更好。
 const onLoad = () => {
   newsStore.getNewsList()
 }
